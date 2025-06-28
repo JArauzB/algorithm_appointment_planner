@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+        <action>
+            <actionName>CUSTOM-site</actionName>
+            <displayName>site</displayName>
+            <goals>
+                <goal>javadoc:javadoc</goal>
+                <goal>site:site</goal>
+            </goals>
+            <activatedProfiles>
+                <activatedProfile>all-javadoc</activatedProfile>
+            </activatedProfiles>
+        </action>
+        <action>
+            <actionName>CUSTOM-javadoc</actionName>
+            <displayName>javadoc</displayName>
+            <goals>
+                <goal>compile</goal>
+                <goal>javadoc:javadoc</goal>
+            </goals>
+            <activatedProfiles>
+                <activatedProfile>all-javadoc</activatedProfile>
+            </activatedProfiles>
+        </action>
+        <action>
+            <actionName>CUSTOM-Install project</actionName>
+            <displayName>Install project</displayName>
+            <goals>
+                <goal>install:install</goal>
+            </goals>
+        </action>
+        <action>
+            <actionName>build</actionName>
+            <packagings>
+                <packaging>*</packaging>
+            </packagings>
+            <goals>
+                <goal>package</goal>
+            </goals>
+        </action>
+        <action>
+            <actionName>javadoc</actionName>
+            <packagings>
+                <packaging>*</packaging>
+            </packagings>
+            <goals>
+                <goal>generate-sources</goal>
+                <goal>compile</goal>
+                <goal>javadoc:javadoc</goal>
+            </goals>
+        </action>
+    </actions>

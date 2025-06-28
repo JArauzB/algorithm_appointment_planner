@@ -1,0 +1,347 @@
+ifdef::env-github[]
+:imagesdir: images/
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+:imagesdir: images
+:toc:
+:toc-placement!:
+== Introduction
+
+This assignment is about the development of an appointment planner. Take in mind the scenario of calling a dentist to make an appointment. You are asking for an appointment, possibly with time constraints, the dental assistant will check if an appointment can be scheduled.
+
+The goal of the assignment is to get familiar with the Linked List data structure, but also to further develop your Test Driven Development skills.
+
+toc::[]
+
+=== Time allocation
+
+Of course, when managing a calendar, you could choose the strategy to keep track of appointments only. When there are no appointments on a day, your list of appointments is empty. When you add an appointment, there is one appointment in the list, etc. However, the advised approach is to use an *Allocation Strategy* on a time line. When there are no appointments, there is one element in your list: an available TimeSlot (from start of the day till end of the day). When an appointment is added at the middle of the day, you end up with three items in your list:
+
+* A free TimeSlot from day start untill beginning of the appointment
+
+* An occupied TimeSlot, the appointment
+
+* A free TimeSlot from appointment end untill the end of the day
+
+
+Adding an Appointment is now basically split in two steps:
+
+* Finding a free TimeSlot where the Appointment fits in
+
+* Cutting-up the free TimeSlot in pieces. What are the scenario's?
+
+** The appointment has the same duration as the TimeSlot; the TimeSlot simply becomes occupied. No cut needed.
+
+** The appointment is at the beginning of the TimeSlot; the TimeSlot is cut into two parts, being the appointment followed by a free TimeSlot.
+
+** The appointment is in the middle of a TimeSlot; the TimeSlot is cut into three parts, being a free Timeslot, the appointment, followed by a free TimeSlot again.
+
+** The appointment is at the end of the TimeSlot; the TimeSlot is cut into two parts, being a free TimeSlot, followed by the appointment.
+
+You'll notice that the allocation strategy makes live easier! Have a look at the figure below. You'll recognize that the 4th scenario (as described above) is visualized here.
+
+.Time allocation
+image::timeAllocation.svg[]
+
+
+
+=== Dealing with time in Java
+
+In the previous assignment, we developed some time-related classes ourselved. That's of course bad practice. Better use existing and already tested compenents! For time and date we will use the java.time API. This implies that points in time are expressed as instances of `java.time.Instant` and time duration in `java.time.Duration`. 
+`LocalTime` and `LocalDate` (at a specific time zone, e.g. Amsterdam time) will be used at the end user level, to represent time and date values.
+
+The requirements state that the appointment planner service should work across time zone boundaries. This is perfectly possible, using the java.time API. Don't hesitate to study this API again.
+
+To make the API robust for use when applied to making appointments across the globe, the time is managed based on `java.time.Instant` objects, which are moments in time in UTC. `TimeSlot` objects are then simply amounts of the time between two Instants on the timeline.
+
+To give the human user a friendly interface the planned times and dates can be represented as `LocalTime` and `LocalDate` 
+values by using the `LocalDay` class provided in the API. This is a utility class provided by us, that can be used to do time conversions.
+
+
+=== Task 1: Study the API
+
+We'll be testing against interfaces. The interfaces describe the requirements you have to implement. You'll implement the interfaces.
+
+Right-click the project "appointmentplanner-api" in NetBeans and select "Generate JavaDoc". This will convert all JavaDocumentation in a well readable html-format. The link to the documentation can be found in the output, or simply in the directory "/target/site/apidocs". *TAKE TIME TO READ THROUGH THE API FIRST!* A key succes factor is not to start coding immediately! (of course, you can also read Javadoc from code, but that might be less convenient).
+
+The class diagram below gives an overview of the complete API. Details have been left out, but are described in the API. 
+
+.Abbreviated API class diagram
+image::cd-abrev-v4_0.svg[]
+
+Some remarks regarding the types you can see in the class diagram:
+
+* The `LocalDayPlan` can be seen as the external interface for users of the planning service, a kind of Facade (you might discuss the Facade pattern in DARC). The interaction with the "user" (which would typically be a Graphical User Interface), is mainly based on `AppointmentData`, `LocalTime` and `TimePreference`. Based on these, the system will internally create an `AppointmentRequest` and possibly an `Appointment`; the creation of objects of these types is never done by the "user", they will be returned to the user via the `LocalDayPlan` interface however.
+
+* Since `LocalDayPlan` serves as external interface, this is the perfect starting point to Test Driven develop the system based on the user requirements. Therefore, that's what we mainly will do in the exercise.
+
+* The `LocalDayPlan` implementation is mainly a "passthrough". The actual workhorse is the `TimeLine`. Most methods in `LocalDayPlan` are default methods. The difference between these two (the interface is quite similar), is that a TimeLine manages time in UTC. The `LocalDayPlan` is in the user TimeZone and will take care of converting LocalTime requests to UTC.
+
+* `LocalDay` is a specific day in a certain Time Zone. No work for you in this class.
+
+* Typically, a user wants to make an appointment, providing `AppointmentData` and an indication of preferred time:
+
+** When only a preferred `LocalTime` is passed, this means that the user wants to have an appointment at this specific time. If there is no suitable TimeSlot available, no Appointment will be created. 
+
+** When only a `TimePreference` is passed, like EARLIEST, the user is not interested in a specific time and leaves it to the appoitmentplanner to come up with a time that fits to the time preference.
+
+** When both `LocalTime` AND `TimePreference` are provided, the appointmentplanner tries to schedule the appointment at the given time, but if this is not possible, it will use the `TimePreference` approach as fallback scenario. 
+
+* The signatures of the factory methods in `AbstractAPFactory` give a clear indication of how constructors of the different types will look like. At least they give a hint, of course the implementation details are up to you. 
+
+* The appointment planner can't be used for appointments crossing day boundaries. 
+
+=== Making your implementation available
+
+Since we are testing against interfaces, we do not know the names of your classes that implement the interfaces. That's also not necessary, because we use a factory again, just like in the SimpleTime assignment.
+
+The "appointmentplanner-impl" project, in which you'll write your solutions, already contains the class `APFactory` that implements the `AbstractAPFactory` interface. The `module-info.java` in this project is predefined (see default package) and makes sure that the APFactory service can be automatically loaded (provides...with...). In the Test Packages, we provide you with a `ServiceFinder` containing a static method to retrieve an `AbstractAPFactory` object. We'll use the `ServiceFinder` in our teacher tests; you could use it as well in your own tests. 
+
+=== Test Driven Development
+
+[CAUTION]
+====
+*Testing* and *feedback*
+
+* You should work test driven.
+  Write only the code that is needed in your tests.
+  That way you will keep your code *coverage near 100%*.
+* Your code will be tested soon after a push and the results will be published in Codegrade, if the coverage of YOUR tests on YOUR implementation is above 95%.
+====
+
+=== Teacher's Test data
+
+In our black box tests, which we apply to the student's project, we use the following test data, presented as a diagram.
+
+.teacher test data
+image::daytestplan.svg[]
+
+As an example: If you need to know what the meaning of for instance `app6` in any error message, you can look in the diagram and infer that it
+is an appointment to be planned between 14:30 (LocalTime) and 15:00, length 30 minutes.
+
+We will be using this test set in many of the tests.
+
+* For instance, the day with which we test is filled with app1..7 from the diagram, such that this
+  implicitly tests that appointments with fixed times can be added.
+* Then some of the appointments may be removed, which tests the removal of appointments.
+  After that it should be possible to add an appointment with a longer duration.
+* In some other tests, the 'day' may be created shorter, to ensure that no appointment will fit and to test how the implementation reacts to that.
+
+.test data file used in the teachers tests
+[source,java]
+----
+package appointmentplanner;
+
+import appointmentplanner.api.AbstractAPFactory;
+import appointmentplanner.api.LocalDay;
+import appointmentplanner.api.LocalDayPlan;
+import appointmentplanner.api.Priority;
+import appointmentplanner.api.TimePreference;
+import java.time.Duration;
+import java.time.LocalTime;
+
+/**
+ *
+ * @author Pieter van den Hombergh {@code p.vandenhombergh@fontys.nl}
+ */
+interface TestData {
+
+    static final AbstractAPFactory fac = GetFactory.getFactory();
+    static final LocalDay TODAY = new LocalDay();
+    static final LocalTime T08_30 = LocalTime.of( 8, 30 );
+    static final LocalTime T09_00 = LocalTime.of( 9, 0 );
+    static final LocalTime T09_30 = LocalTime.of( 9, 30 );
+    static final LocalTime T10_00 = LocalTime.of( 10, 0 );
+    static final LocalTime T10_30 = LocalTime.of( 10, 30 );
+    static final LocalTime T10_45 = LocalTime.of( 10, 45 );
+    static final LocalTime T11_10 = LocalTime.of( 11, 10 );
+    static final LocalTime T14_30 = LocalTime.of( 14, 30 );
+    static final LocalTime T15_00 = LocalTime.of( 15, 0 );
+    static final LocalTime T15_15 = LocalTime.of( 15, 15 );
+    static final LocalTime T15_45 = LocalTime.of( 15, 45 );
+    static final LocalTime T16_00 = LocalTime.of( 16, 00 );
+    static final LocalTime T17_30 = LocalTime.of( 17, 30 );
+
+    static final Duration D15 = Duration.ofMinutes( 15 );
+    static final Duration D30 = Duration.ofMinutes( 30 );
+    static final Duration D80 = Duration.ofMinutes( 80 );
+    static final Duration D90 = Duration.ofMinutes( 90 );
+    static final Duration D200 = Duration.ofMinutes( 200 );
+
+    static final APAppointmentData DATA1 = new APAppointmentData( "app1 30 min @9:00", D30, Priority.LOW );
+    static final APAppointmentData DATA2 = new APAppointmentData( "app2 30 min @9:30", D30, Priority.LOW );
+    static final APAppointmentData DATA3 = new APAppointmentData( "app3 15 min @10:30", D15, Priority.MEDIUM );
+    static final APAppointmentData DATA4 = new APAppointmentData( "app4 15 min @10:45", D15, Priority.HIGH );
+    static final APAppointmentData DATA5 = new APAppointmentData( "app5 200 min @11:10", D200, Priority.HIGH );
+    static final APAppointmentData DATA6 = new APAppointmentData( "app6 30 min @14:30", D30, Priority.LOW );
+    static final APAppointmentData DATA7 = new APAppointmentData( "app7 90 min @16:00", D90, Priority.LOW );
+
+    static final APAppointmentRequest AR1 = new APAppointmentRequest( DATA1, T09_00, TimePreference.UNSPECIFIED );
+    static final APAppointmentRequest AR2 = new APAppointmentRequest( DATA2, T09_30 );
+    static final APAppointmentRequest AR3 = new APAppointmentRequest( DATA3, T10_30 );
+    static final APAppointmentRequest AR4 = new APAppointmentRequest( DATA4, T10_45 );
+    static final APAppointmentRequest AR5 = new APAppointmentRequest( DATA5, T11_10 );
+    static final APAppointmentRequest AR6 = new APAppointmentRequest( DATA6, T14_30 );
+    static final APAppointmentRequest AR7 = (APAppointmentRequest) fac.createAppointmentRequest( DATA7, T16_00, TimePreference.EARLIEST );
+
+    static LocalDayPlan standardDay() {
+        LocalDayPlan td = emptyWorkingDay();
+        addApps( td, AR1, AR2, AR3, AR4, AR5, AR6, AR7 );
+        return td;
+    }
+
+    static LocalDayPlan emptyWorkingDay() {
+        return fac.createLocalDayPlan( TODAY, LocalTime.of( 8, 30 ), LocalTime.of( 17, 30 ) );
+    }
+
+    static LocalDayPlan addApps( LocalDayPlan dp, APAppointmentRequest... app ) {
+
+        for ( APAppointmentRequest ar : app ) {
+            ar.apply( fac, dp );
+        }
+        return dp;
+    }
+
+}
+----
+
+=== Task 2: Start implementing the service
+
+You should start easy. There are a few data classes, specified as interfaces `AppointmentRequest` and `AppointmentData` that should be easy to implement. The implementing class could simply have the same name, as long as you put it a different package. So `AppointmentDataImpl`, `myimpl.AppointmentData`, or `JohnsAppointmentData` would all be fine.
+
+
+The TimeLine is the tricky part.
+
+=== Timeline model
+
+Because we want to make sure that the exercise is doable, we created an implementation which can serve as
+a source of ideas. We share the ideas, not the implementation.
+
+In the implementation, the TimeLine internally maintains a doubly linked list of special purpose nodes.
+
+.Time line model.
+image::cut-it-up-v40.svg[]
+
+The timeline model shows a doubly linked list of special purpose nodes of type 'AllocationNode'
+that have a notion of points in time and distance (duration) between
+those points and a 'purpose'. The *invariant* of the Timeline implementing class is that there are never adjacent free slots. To keep this invariant true, if a slot is freed, it must be merged with
+any free adjacent slot. In the picture: If allocation *b* would be freed,
+it would be merged with both the left hand and right hand free block
+into one free block, extending  from the start of *a* to the end of *c*.
+
+
+=== Hints to the implementor
+
+If you use modern programming techniques such as lambda expressions and streams, the implementation will become more elegant and will
+have less code overall. Using streams makes it particularly simple to select time slots or appointments by applying the appropriate filtering.
+Having streams for each direction (from early to late and from late to early) also helps to ease the implementation of a few API methods.
+
+Even in the case of having your own double linked list, it is possible to use streams. The only requirement is that you write your
+own *Iterator*. While you are at it, create (and of course test) an Iterator that starts at the other end too.
+When you have an iterator, creating a stream is easy, just use the following recipe.
+
+.Streaming using your home made iterator
+[source,java]
+----
+Stream<AllocationNode> stream() {
+        Spliterator<AllocationNode> spliterator = Spliterators.spliteratorUnknownSize( iterator(), ORDERED );
+        return StreamSupport.stream( spliterator, false );
+}
+----
+
+The iterator method returns your iterator, which is then used to create a stream. In the example the stream streams allocation nodes.
+From there you can use a `map(...)` to for instance retrieve the appointment info or create other objects on the fly.
+
+You can also easily create a reverse stream, using a `reverseIterator()` that you can implement. In all cases the resulting stream can be used as a normal (Java 8)
+stream, to filter, sort, map, and reduce. Useful reduce operations are min, max, collect etc. In many cases the required API methods can then be implemented with one or two not too complex statements.
+
+=== Combining appointments, finding common free time.
+
+The most useful way to make appointments is to have at least two parties involved. Examples: You and your class, or you at the dentist's. The problem is to find common free time.
+
+The figure below shows a scenario with 4 TimeLines. Free TimeSlots (gaps) are colored Cyan (red in dark mode). The "matching free slots" are slots that are available in all TimeLines. The three matching slots in the scenario below are colored Green (purple in dark mode).
+
+.Four timelines with their free time slots input cyan, output green.
+image::timelines.svg[]
+
+
+*How to find matching free slots?*
+
+* The free slots have two edges, the starting edge and the ending edge.
+* A vertical dashed line demarcates a interesting point (an Instant) in time, such as the time of one or more edges.
+* For a dashed line to be of interest to the finding common free slots problem, that line must touch or cut a free time slot in ALL TimeLines.
+** In the example, *a*, *b*, and *c* do not cut; *d* only cuts *I*,  and *e* cuts *I* and *III*.
+* For a _starting edge_ to be of interest, it must be the _maximum_ starting edge of all Timelines. 
+** The starting edge of *I* is *c*, of *II* is *a*, of *III* is *d* and of *IV* is *e*. Therefore, the maximum starting edge is *e*.
+* For an _ending edge_, it must be the _minimum_ ending edge of the first free slot in all TimeLines. 
+** The ending edge of *I* is *f*, of *II* is *b*, of *III* is *g* and of *IV* is *g* too. Therefore, the minimum ending edge is *b*.
+* Since the minimum ending edge is before the maximum starting edge (*b* < *e*), there is no matching slot for the first free gaps on every TimeLine.
+* For each TimeLine, skip all gaps that end before or at the same time of the current maximum start edge. 
+** In this case, the first gap in TimeLine *II* must be skipped.
+* Now start again with finding the maximum start edge... and repeat the procedure. 
+** The new maximum start edge is *j* and the minimum end edge is k. Since k is greater than j, we found our first "matching free slot".
+
+* Repeat the procedure till one of the TimeLines runs out of available TimeSlots.
+
+Different implementations are possible. First think about "what" should be done and write pseudo-code, afterwards think about the "how" and start coding.
+
+=== Your tasks per week
+
+* Week 2 
+** Carefully read the API! Take at least an hour to study it and to study the given code (sitting on your hands, not writing code!). 
+** Test-Driven develop the implementation of `AppointmentData` and `AppointmentRequest`.
+** Test-Driven develop the implementation of the methods in LocalDayPlan (simple getters): 
+*** `getDay()` 
+*** `earliest()`
+*** `tooLate()` 
+*** `getTimeline()` 
+*** `getStartTime()` 
+*** `getEndTime()`
+
+
+* Week 3
+** Test-Driven develop the implementation of the methods in LocalDayPlan: 
+*** `toString()`
+*** `getGapsFitting( Duration dur )`
+*** `canAddAppointmentOfDuration( Duration dur )`
+
+
+* Week 4
+** Test-Driven develop the implementation of the methods in LocalDayPlan: 
+*** `getNrOfAppointments()`
+*** `contains( Appointment appointment )`
+*** `addAppointment( AppointmentData appointmentData, LocalTime startTime )`
+
+
+* Week 5
+** Test-Driven develop the implementation of the methods in LocalDayPlan: 
+*** `getGapsFittingReversed( Duration dur )`
+*** `getGapsFittingLargestFirst( Duration dur )`
+*** `getGapsFittingSmallestFirst( Duration dur )`
+*** `addAppointment( AppointmentData appointmentData, LocalTime start, TimePreference fallback )`
+*** `addAppointment( AppointmentData appointmentData, TimePreference pref )`
+
+* Week 6
+** Test-Driven develop the implementation of the methods in LocalDayPlan: 
+*** `getAppointments()`
+*** `findAppointments( Predicate<Appointment> filter )`
+*** `removeAppointment( Appointment appointment )`
+*** `removeAppointments( Predicate<Appointment> filter )`
+
+* Week 7
+** Test-Driven develop the implementation of the methods in LocalDayPlan: 
+*** `getMatchingFreeSlotsOfDuration()`
+*** Other methods that might not have been mentioned above. 
+
+
+
+
+
+
+
+
+
